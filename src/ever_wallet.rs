@@ -130,30 +130,12 @@ impl EverWallet {
         Ok(status)
     }
 
-    pub async fn send(&mut self, dest: &str, value: u128) -> Result<SendReceipt> {
+    pub async fn send(&mut self, dest: &StdAddr, value: u128) -> Result<SendReceipt> {
         self.send_transaction(dest, value, MSG_FLAGS_SIMPLE_SEND, false, None)
             .await
     }
 
-    pub async fn send_to(&mut self, dest: &StdAddr, value: u128) -> Result<SendReceipt> {
-        self.send_transaction_to(dest, value, MSG_FLAGS_SIMPLE_SEND, false, None)
-            .await
-    }
-
     pub async fn send_transaction(
-        &mut self,
-        dest: &str,
-        value: u128,
-        flags: u8,
-        bounce: bool,
-        payload: Option<&Cell>,
-    ) -> Result<SendReceipt> {
-        let dest: StdAddr = dest.parse()?;
-        self.send_transaction_to(&dest, value, flags, bounce, payload)
-            .await
-    }
-
-    pub async fn send_transaction_to(
         &mut self,
         dest: &StdAddr,
         value: u128,

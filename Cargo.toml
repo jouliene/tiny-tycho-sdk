@@ -11,3 +11,9 @@ bip39 = { version = "2", features = ["rand"] }
 zeroize = "1.8"
 tiny-hderive = "0.3"
 rand = "0.8"
+
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+serde = "1"
+serde_json = "1"
+tycho-types = "0.3.2"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

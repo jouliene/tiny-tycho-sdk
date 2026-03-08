@@ -1,7 +1,9 @@
 use anyhow::Result;
-use tiny_tycho_sdk::Keys;
+use tiny_tycho_sdk::{JrpcTransport, Keys};
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
+    // Keys generation test module
     let phrase = "alter sustain pulp catalog announce tail bunker mammal figure burger party title";
     let keys_0 = Keys::from_seed_phrase(phrase)?; //use index=0 by default
     println!("Public 0: {}", keys_0.public_key_hex());
@@ -26,6 +28,15 @@ fn main() -> Result<()> {
     )?;
     println!("Public derived: {}", der_key.public_key_hex());
     println!("Secret derived: {}", der_key.secret_key_hex());
+
+    // Jrpc test module
+    let transport = JrpcTransport::new("https://rpc-testnet.tychoprotocol.com")?;
+    let caps = transport.get_capabilities().await?;
+    println!("Capabilities: {caps:#?}");
+
+    let sig_ctx = transport.get_signature_context().await?;
+    println!("global_id: {}", sig_ctx.global_id);
+    println!("capabilities: {:?}", sig_ctx.capabilities);
 
     Ok(())
 }

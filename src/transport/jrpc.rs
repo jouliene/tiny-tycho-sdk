@@ -2,13 +2,37 @@ use anyhow::{Context, Result, bail};
 use reqwest::Url;
 use serde::{Deserialize, Deserializer, Serialize, de::DeserializeOwned};
 use std::time::Duration;
-use tycho_types::models::{Account, AccountStatus, BlockchainConfig, StdAddr};
+use tycho_types::models::{
+    Account, AccountStatus, BlockchainConfig, GlobalCapabilities, GlobalCapability,
+    SignatureDomain, StdAddr,
+};
 use tycho_types::prelude::{Boc, BocRepr, Cell, DynCell, Load};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SignatureContext {
     pub global_id: i32,
-    pub capabilities: u64,
+    pub capabilities: GlobalCapabilities,
+    pub domain: SignatureDomain,
+}
+
+impl SignatureContext {
+    pub fn uses_signature_domain(&self) -> bool {
+        self.capabilities
+            .contains(GlobalCapability::CapSignatureDomain)
+    }
+
+    pub fn legacy_signature_id(&self) -> Option<i32> {
+        if self.uses_signature_domain() {
+            None
+        } else if self
+            .capabilities
+            .contains(GlobalCapability::CapSignatureWithId)
+        {
+            Some(self.global_id)
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -125,10 +149,14 @@ impl JrpcTransport {
 
     pub async fn get_signature_context(&self) -> Result<SignatureContext> {
         let response = self.get_blockchain_config().await?;
+        let capabilities = response.config.get_global_version()?.capabilities;
 
         Ok(SignatureContext {
             global_id: response.global_id,
-            capabilities: response.config.get_global_version()?.capabilities.into(),
+            capabilities,
+            domain: SignatureDomain::L2 {
+                global_id: response.global_id,
+            },
         })
     }
 

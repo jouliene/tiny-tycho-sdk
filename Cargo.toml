@@ -1,0 +1,13 @@
+[package]
+name = "tiny-tycho-sdk"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ed25519-dalek = { version = "2", features = ["rand_core"] }
+hex = "0.4"
+anyhow = "1"
+bip39 = { version = "2", features = ["rand"] }
+zeroize = "1.8"
+tiny-hderive = "0.3"
+rand = "0.8"

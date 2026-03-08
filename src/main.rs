@@ -3,7 +3,7 @@ use tiny_tycho_sdk::Keys;
 
 fn main() -> Result<()> {
     let phrase = "alter sustain pulp catalog announce tail bunker mammal figure burger party title";
-    let keys_0 = Keys::from_seed_phrase(phrase)?;
+    let keys_0 = Keys::from_seed_phrase(phrase)?; //use index=0 by default
     println!("Public 0: {}", keys_0.public_key_hex());
     println!("Secret 0: {}", keys_0.secret_key_hex());
 

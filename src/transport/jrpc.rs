@@ -1,7 +1,9 @@
+use std::borrow::Cow;
+use std::time::Duration;
+
 use anyhow::{Context, Result, bail};
 use reqwest::Url;
 use serde::{Deserialize, Deserializer, Serialize, de::DeserializeOwned};
-use std::time::Duration;
 use tycho_types::models::{
     Account, AccountStatus, BlockchainConfig, GlobalCapabilities, GlobalCapability,
     SignatureDomain, StdAddr,
@@ -12,25 +14,49 @@ use tycho_types::prelude::{Boc, BocRepr, Cell, DynCell, Load};
 pub struct SignatureContext {
     pub global_id: i32,
     pub capabilities: GlobalCapabilities,
-    pub domain: SignatureDomain,
 }
 
 impl SignatureContext {
+    pub fn uses_signature_id(&self) -> bool {
+        self.capabilities
+            .contains(GlobalCapability::CapSignatureWithId)
+    }
+
     pub fn uses_signature_domain(&self) -> bool {
         self.capabilities
             .contains(GlobalCapability::CapSignatureDomain)
     }
 
-    pub fn legacy_signature_id(&self) -> Option<i32> {
+    pub fn signature_domain(&self) -> SignatureDomain {
         if self.uses_signature_domain() {
-            None
-        } else if self
-            .capabilities
-            .contains(GlobalCapability::CapSignatureWithId)
-        {
+            SignatureDomain::L2 {
+                global_id: self.global_id,
+            }
+        } else {
+            SignatureDomain::Empty
+        }
+    }
+
+    pub fn legacy_signature_id(&self) -> Option<i32> {
+        if self.uses_signature_id() && !self.uses_signature_domain() {
             Some(self.global_id)
         } else {
             None
+        }
+    }
+
+    pub fn apply<'a>(&self, data: &'a [u8]) -> Cow<'a, [u8]> {
+        if !self.uses_signature_id() {
+            return Cow::Borrowed(data);
+        }
+
+        if self.uses_signature_domain() {
+            self.signature_domain().apply(data)
+        } else {
+            let mut result = Vec::with_capacity(4 + data.len());
+            result.extend_from_slice(&self.global_id.to_be_bytes());
+            result.extend_from_slice(data);
+            Cow::Owned(result)
         }
     }
 }
@@ -154,9 +180,6 @@ impl JrpcTransport {
         Ok(SignatureContext {
             global_id: response.global_id,
             capabilities,
-            domain: SignatureDomain::L2 {
-                global_id: response.global_id,
-            },
         })
     }
 

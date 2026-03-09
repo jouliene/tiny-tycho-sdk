@@ -6,7 +6,6 @@ use anyhow::{Context, Result, anyhow, bail};
 use ed25519_dalek::VerifyingKey;
 use tycho_types::abi::{
     AbiHeaderType, AbiVersion, Function, IntoAbi, UnsignedExternalMessage, WithAbiType,
-    extend_signature_with_id,
 };
 use tycho_types::models::{AccountStatus, OwnedMessage, StateInit, StdAddr};
 use tycho_types::num::Tokens;
@@ -15,16 +14,24 @@ use tycho_types::prelude::*;
 use crate::Keys;
 use crate::transport::jrpc::{GetContractStateResponse, JrpcTransport, SignatureContext};
 
-pub const MSG_FLAGS_SEPARATE_FEES: u8 = 1;
-pub const MSG_FLAGS_IGNORE_ACTION_ERRORS: u8 = 2;
-pub const MSG_FLAGS_SIMPLE_SEND: u8 = 3;
-pub const MSG_FLAGS_DESTROY_IF_ZERO: u8 = 32;
-pub const MSG_FLAGS_CARRY_REMAINING_INBOUND_VALUE: u8 = 64;
-pub const MSG_FLAGS_SEND_ALL_BALANCE: u8 = 128;
+pub const SEND_MODE_ORDINARY: u8 = 0;
+pub const SEND_MODE_CARRY_REMAINING_INBOUND_VALUE: u8 = 64;
+pub const SEND_MODE_SEND_ALL_BALANCE: u8 = 128;
+
+pub const SEND_FLAG_PAY_FWD_FEES_SEPARATELY: u8 = 1;
+pub const SEND_FLAG_IGNORE_ERRORS: u8 = 2;
+pub const SEND_FLAG_BOUNCE_IF_ACTION_FAIL: u8 = 16;
+pub const SEND_FLAG_DESTROY_IF_ZERO: u8 = 32;
+
+// Common combinations
+pub const SEND_MODE_SIMPLE_SEND: u8 =
+    SEND_MODE_ORDINARY | SEND_FLAG_PAY_FWD_FEES_SEPARATELY | SEND_FLAG_IGNORE_ERRORS; // 3
+
+pub const SEND_MODE_ALL_BALANCE_AND_DESTROY: u8 =
+    SEND_MODE_SEND_ALL_BALANCE | SEND_FLAG_DESTROY_IF_ZERO; // 160
 
 const DEFAULT_TTL_SECS: u32 = 60;
 
-/// Published EVER Wallet contract code from broxus/ever-wallet-contract README.
 const EVER_WALLET_CODE_BOC_BASE64: &str = "te6cckEBBgEA/AABFP8A9KQT9LzyyAsBAgEgAgMABNIwAubycdcBAcAA8nqDCNcY7UTQgwfXAdcLP8j4KM8WI88WyfkAA3HXAQHDAJqDB9cBURO68uBk3oBA1wGAINcBgCDXAVQWdfkQ8qj4I7vyeWa++COBBwiggQPoqFIgvLHydAIgghBM7mRsuuMPAcjL/8s/ye1UBAUAmDAC10zQ+kCDBtcBcdcBeNcB10z4AHCAEASqAhSxyMsFUAXPFlAD+gLLaSLQIc8xIddJoIQJuZgzcAHLAFjPFpcwcQHLABLM4skB+wAAPoIQFp4+EbqOEfgAApMg10qXeNcB1AL7AOjRkzLyPOI+zYS/";
 
 #[derive(Debug, Clone, WithAbiType, IntoAbi)]
@@ -131,7 +138,7 @@ impl EverWallet {
     }
 
     pub async fn send(&mut self, dest: &StdAddr, value: u128) -> Result<SendReceipt> {
-        self.send_transaction(dest, value, MSG_FLAGS_SIMPLE_SEND, false, None)
+        self.send_transaction(dest, value, SEND_MODE_SIMPLE_SEND, false, None)
             .await
     }
 
@@ -252,18 +259,8 @@ impl EverWallet {
         unsigned: UnsignedExternalMessage,
         signature_context: SignatureContext,
     ) -> Result<OwnedMessage> {
-        let signature = if signature_context.uses_signature_domain() {
-            let data = signature_context
-                .domain
-                .apply(unsigned.body.hash.as_slice());
-            self.keys.sign(data.as_ref())
-        } else {
-            let data = extend_signature_with_id(
-                unsigned.body.hash.as_slice(),
-                signature_context.legacy_signature_id(),
-            );
-            self.keys.sign(data.as_ref())
-        };
+        let data = signature_context.apply(unsigned.body.hash.as_slice());
+        let signature = self.keys.sign(data.as_ref());
 
         unsigned
             .with_signature(&signature)

@@ -12,7 +12,8 @@ use tycho_types::num::Tokens;
 use tycho_types::prelude::*;
 
 use crate::Keys;
-use crate::transport::jrpc::{GetContractStateResponse, JrpcTransport, SignatureContext};
+use crate::account::{AccountInfo, ContractState};
+use crate::transport::jrpc::{JrpcTransport, SignatureContext};
 
 pub const SEND_MODE_ORDINARY: u8 = 0;
 pub const SEND_MODE_CARRY_REMAINING_INBOUND_VALUE: u8 = 64;
@@ -114,21 +115,29 @@ impl EverWallet {
     }
 
     pub async fn status(&self) -> Result<AccountStatus> {
-        self.transport.get_account_status(&self.address).await
-    }
-
-    pub async fn balance(&self) -> Result<Option<Tokens>> {
-        match self.transport.get_contract_state(&self.address).await? {
-            GetContractStateResponse::NotExists {} => Ok(None),
-            GetContractStateResponse::Exists { account } => Ok(Some(account.balance.tokens)),
-            GetContractStateResponse::Unchanged {} => {
-                bail!("unexpected getContractState response: Unchanged")
-            }
+        match self.contract_state().await? {
+            ContractState::NotExists => Ok(AccountStatus::NotExists),
+            ContractState::Unchanged => bail!("unexpected getContractState response: Unchanged"),
+            ContractState::Exists(info) => Ok(info.status),
         }
     }
 
+    pub async fn balance(&self) -> Result<Option<Tokens>> {
+        Ok(self.account_info().await?.map(|info| info.balance_tokens))
+    }
+
+    pub async fn contract_state(&self) -> Result<ContractState> {
+        self.transport.get_account_info(&self.address).await
+    }
+
+    pub async fn account_info(&self) -> Result<Option<AccountInfo>> {
+        self.transport
+            .get_existing_account_info(&self.address)
+            .await
+    }
+
     pub async fn refresh(&mut self) -> Result<AccountStatus> {
-        let status = self.transport.get_account_status(&self.address).await?;
+        let status = self.status().await?;
         let signature_context = self.transport.get_signature_context().await?;
 
         self.cached_status = Some(status);

@@ -1,7 +1,9 @@
+pub mod account;
 pub mod ever_wallet;
 pub mod keys;
 pub mod transport;
 
+pub use account::{AccountInfo, AccountStateInfo, ContractState};
 pub use ever_wallet::{
     EverWallet, SEND_FLAG_BOUNCE_IF_ACTION_FAIL, SEND_FLAG_DESTROY_IF_ZERO,
     SEND_FLAG_IGNORE_ERRORS, SEND_FLAG_PAY_FWD_FEES_SEPARATELY, SEND_MODE_ALL_BALANCE_AND_DESTROY,

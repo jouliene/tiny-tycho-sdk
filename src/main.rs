@@ -183,6 +183,19 @@ async fn main() -> Result<()> {
     println!("wallet refresh(): {:?}", refreshed_status);
     println!("wallet after refresh debug: {:?}", wallet);
 
+    let info = wallet
+        .account_info()
+        .await?
+        .expect("wallet account must exists");
+
+    println!("wallet address: {}", info.address);
+    println!("wallet status: {:?}", info.status);
+    println!("wallet balance: {:?}", info.balance_tokens);
+    println!("wallet cells: {:?}", info.used_cells);
+    println!("wallet bits: {:?}", info.used_bits);
+    println!("wallet code hash: {:?}", info.code_hash);
+    println!("wallet data hash: {:?}", info.data_hash);
+
     // -------------------------------------------------
     // 4. SEND MODES / FLAGS
     // -------------------------------------------------

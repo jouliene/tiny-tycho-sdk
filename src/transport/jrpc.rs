@@ -1,9 +1,9 @@
-use std::borrow::Cow;
-use std::time::Duration;
-
+use crate::account::{AccountInfo, ContractState};
 use anyhow::{Context, Result, bail};
 use reqwest::Url;
 use serde::{Deserialize, Deserializer, Serialize, de::DeserializeOwned};
+use std::borrow::Cow;
+use std::time::Duration;
 use tycho_types::models::{
     Account, AccountStatus, BlockchainConfig, GlobalCapabilities, GlobalCapability,
     SignatureDomain, StdAddr,
@@ -167,6 +167,23 @@ impl JrpcTransport {
                 bail!("unexpected getContractState response: Unchanged")
             }
         }
+    }
+
+    pub async fn get_account_info(&self, address: &StdAddr) -> Result<ContractState> {
+        match self.get_contract_state(address).await? {
+            GetContractStateResponse::NotExists {} => Ok(ContractState::NotExists),
+            GetContractStateResponse::Unchanged {} => Ok(ContractState::Unchanged),
+            GetContractStateResponse::Exists { account } => Ok(ContractState::Exists(Box::new(
+                AccountInfo::from_account(&account),
+            ))),
+        }
+    }
+
+    pub async fn get_existing_account_info(
+        &self,
+        address: &StdAddr,
+    ) -> Result<Option<AccountInfo>> {
+        Ok(self.get_account_info(address).await?.into_account())
     }
 
     pub async fn get_blockchain_config(&self) -> Result<GetBlockchainConfigResponse> {
